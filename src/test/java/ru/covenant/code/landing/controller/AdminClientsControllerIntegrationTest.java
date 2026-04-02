@@ -1,5 +1,6 @@
 package ru.covenant.code.landing.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -13,7 +14,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 @ActiveProfiles("test")
 @Import(SecurityConfig.class)
 @Transactional
+@DirtiesContext
 @DisplayName("Интеграционные тесты для AdminClientsController")
 class AdminClientsControllerIntegrationTest {
 
@@ -553,6 +557,165 @@ class AdminClientsControllerIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @DisplayName("1.1 Успешный GET запрос статистики - проверка всех полей и значений")
+    @WithMockUser(roles = "ADMIN")
+    @Sql(scripts = {"/sql/clients-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+    @Sql(scripts = {"/sql/clear.sql"}, executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+    void getStats_SuccessfulRequest_ShouldReturnCorrectStats() throws Exception {
+
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+        JsonNode response = objectMapper.readTree(content);
+        JsonNode stats = response.get("result");
+
+        System.out.println("Response: " + content);
+        assertEquals(5, stats.get("total").asLong());
+
+        assertEquals(3, stats.get("newCount").asLong());
+        assertEquals(1, stats.get("processedCount").asLong());
+        assertEquals(1, stats.get("doneCount").asLong());
+
+        assertEquals(5, stats.get("todayCount").asLong());
+
+        assertEquals(0, stats.get("highPriorityCount").asLong());
+        assertEquals(0, stats.get("mediumPriorityCount").asLong());
+        assertEquals(0, stats.get("lowPriorityCount").asLong());
+
+        assertEquals(0, stats.get("backendCount").asLong());
+        assertEquals(0, stats.get("frontendCount").asLong());
+        assertEquals(0, stats.get("fullstackCount").asLong());
+
+        assertEquals(stats.get("total").asLong(),
+                stats.get("newCount").asLong()
+                        + stats.get("processedCount").asLong()
+                        + stats.get("doneCount").asLong());
+    }
+
+    @Test
+    @DisplayName("2.1 Запрос статистики с пустой БД - возвращает нулевую статистику")
+    @WithMockUser(roles = "ADMIN")
+    void getStats_EmptyDatabase_ShouldReturnZeroStats() throws Exception {
+        // Given: Очищаем БД
+        clientsRepository.deleteAll();
+        clientsRepository.flush();
+
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.result.total").value(0))
+                .andExpect(jsonPath("$.result.newCount").value(0))
+                .andExpect(jsonPath("$.result.processedCount").value(0))
+                .andExpect(jsonPath("$.result.doneCount").value(0))
+                .andExpect(jsonPath("$.result.todayCount").value(0))
+                .andExpect(jsonPath("$.result.fullstackCount").value(0))
+                .andExpect(jsonPath("$.result.frontendCount").value(0))
+                .andExpect(jsonPath("$.result.backendCount").value(0))
+                .andExpect(jsonPath("$.result.highPriorityCount").value(0))
+                .andExpect(jsonPath("$.result.mediumPriorityCount").value(0))
+                .andExpect(jsonPath("$.result.lowPriorityCount").value(0));
+    }
+
+    @Test
+    @DisplayName("3.1 Тест авторизации для разных ролей - доступ к статистике")
+    void getStats_AccessControlForDifferentRoles() throws Exception {
+        // Given: Создаем тестовые данные
+        clientsRepository.save(Clients.builder()
+                .email("test@test.com").name("Test").status(Status.NEW).build());
+
+        // When & Then: ADMIN - доступ разрешен
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk());
+
+        // MODERATOR - доступ разрешен
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .with(user("moderator").roles("MODERATOR")))
+                .andExpect(status().isOk());
+
+        // SUPPORT - доступ разрешен
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .with(user("support").roles("SUPPORT")))
+                .andExpect(status().isOk());
+
+        // USER - доступ запрещен
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .with(user("user").roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("4.1 Тест без аутентификации - статистика возвращает 401/302")
+    void getStats_WithoutAuthentication_ShouldReturnUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isFound())  // 302 редирект на /login
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    @DisplayName("5.1 Статистика - проверка корректности подсчета за сегодня")
+    @WithMockUser(roles = "ADMIN")
+    @Sql(scripts = {"/sql/clients-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+    @Sql(scripts = {"/sql/clear.sql"}, executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+    void getStats_TodayCountVerification() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode stats = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("result");
+
+        assertEquals(5, stats.get("total").asLong());
+
+        // так как тестовые данные "только за сегодня" — todayCount должен совпадать с total
+        assertEquals(5, stats.get("todayCount").asLong());
+
+        assertEquals(3, stats.get("newCount").asLong());
+        assertEquals(1, stats.get("processedCount").asLong());
+        assertEquals(1, stats.get("doneCount").asLong());
+
+        // контроль, что статусы сходятся в total
+        assertEquals(stats.get("total").asLong(),
+                stats.get("newCount").asLong()
+                        + stats.get("processedCount").asLong()
+                        + stats.get("doneCount").asLong());
+    }
+
+    @Test
+    @DisplayName("6.1 Статистика - проверка суммирования статусов")
+    @WithMockUser(roles = "ADMIN")
+    void getStats_StatusesSumEqualsTotal() throws Exception {
+        // Создаем по 1 клиенту каждого статуса
+        clientsRepository.saveAll(Arrays.asList(
+                Clients.builder().status(Status.NEW).build(),
+                Clients.builder().status(Status.PROCESSED).build(),
+                Clients.builder().status(Status.DONE).build()
+        ));
+
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+        // Парсим JSON для проверки сумм
+        JsonNode response = objectMapper.readTree(content);
+        JsonNode stats = response.get("result");
+
+        long total = stats.get("total").asLong();
+        long newCount = stats.get("newCount").asLong();
+        long processedCount = stats.get("processedCount").asLong();
+        long doneCount = stats.get("doneCount").asLong();
+
+        assertEquals(total, newCount + processedCount + doneCount);
+    }
     @Test
     @DisplayName("DELETE /api/v1/admin/clients/{id} – успешное удаление клиента")
     @WithMockUser(roles = "ADMIN")

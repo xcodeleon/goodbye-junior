@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.covenant.code.landing.entity.Clients;
+import ru.covenant.code.landing.entity.enumerated.CourseType;
+import ru.covenant.code.landing.entity.enumerated.Priority;
 import ru.covenant.code.landing.entity.enumerated.Status;
 
 import java.time.OffsetDateTime;
@@ -26,4 +28,9 @@ public interface ClientsRepository extends JpaRepository<Clients, UUID>, JpaSpec
 
     boolean existsByEmail(String email);
 
+    long countByCreatedAtAfter(OffsetDateTime date);
+
+    long countByCourseType(CourseType courseType);
+
+    long countByPriority(Priority priority);
 }

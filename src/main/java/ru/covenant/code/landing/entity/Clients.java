@@ -60,6 +60,7 @@ public class Clients {
 
     @CreationTimestamp
     @Column(name = "created_at",
+            columnDefinition = "timestamp(6) with time zone",
             updatable = false, nullable = false)
     OffsetDateTime createdAt;
 

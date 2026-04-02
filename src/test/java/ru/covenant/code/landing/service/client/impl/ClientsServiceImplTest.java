@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.transaction.annotation.Transactional;
 import ru.covenant.code.landing.dto.client.request.ClientsFilterRqDto;
 import ru.covenant.code.landing.dto.client.request.ClientsUpdateRqDto;
 import ru.covenant.code.landing.dto.client.response.ClientsAdminRsDto;
@@ -28,7 +29,9 @@ import ru.covenant.code.landing.repository.ClientsRepository;
 import ru.covenant.code.landing.specification.ClientsSpecification;
 import ru.covenant.code.landing.ws.service.WebSocketPublisher;
 
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -123,6 +126,85 @@ class ClientsServiceImplTest {
     }
 
     @Test
+    @DisplayName("Тест 1.1: Успешное получение полной статистики")
+    void getStats_ShouldReturnFullStats_WhenDataExists() {
+
+        when(clientsRepository.count()).thenReturn(100L);
+        when(clientsRepository.countByStatus(Status.NEW)).thenReturn(10L);
+        when(clientsRepository.countByStatus(Status.PROCESSED)).thenReturn(20L);
+        when(clientsRepository.countByStatus(Status.DONE)).thenReturn(70L);
+        when(clientsRepository.countByCreatedAtBetween(any(), any())).thenReturn(15L);
+
+        ClientsStatsRsDto result = clientsService.getStats();
+
+        assertNotNull(result);
+        assertEquals(100L, result.getTotal());
+        assertEquals(15L, result.getTodayCount());
+        assertEquals(10L, result.getNewCount());
+    }
+
+    @Test
+    @DisplayName("Тест 2.1: Статистика с пустой БД - возвращает нулевые значения")
+    void getStats_WithEmptyDatabase_ShouldReturnZeroStats() {
+
+        when(clientsRepository.count()).thenReturn(0L);
+
+        ClientsStatsRsDto result = clientsService.getStats();
+
+        assertNotNull(result, "Результат не должен быть null");
+        assertEquals(0, result.getTotal(), "Общее количество клиентов должно быть 0");
+        verify(clientsRepository, times(1)).count();
+
+        verifyNoInteractions(clientsMapper);
+    }
+
+    @Test
+    @DisplayName("Тест 3.1: При ошибке в репозитории возвращается нулевая статистика")
+    void getStats_WhenRepositoryThrowsException_ShouldReturnZeroStatsAndLogError() {
+        when(clientsRepository.count()).thenThrow(new RuntimeException("DB Error"));
+
+        ClientsStatsRsDto result = clientsService.getStats();
+
+        assertEquals(0, result.getTotal());
+        assertEquals(0, result.getTodayCount());
+    }
+
+    @Test
+    @DisplayName("Тест 4.1: Проверка вычисления начала текущего дня")
+    void getStats_ShouldCalculateStartOfDayCorrectly() {
+
+        when(clientsRepository.count()).thenReturn(0L);
+        when(clientsRepository.countByStatus(any())).thenReturn(0L);
+
+        when(clientsRepository.countByCreatedAtBetween(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(5L);
+
+        ClientsStatsRsDto result = clientsService.getStats();
+
+        ArgumentCaptor<OffsetDateTime> startCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
+        ArgumentCaptor<OffsetDateTime> endCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
+
+        verify(clientsRepository).countByCreatedAtBetween(startCaptor.capture(), endCaptor.capture());
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        assertEquals(LocalTime.MIN, startCaptor.getValue().toLocalTime());
+        assertEquals(LocalTime.MAX, endCaptor.getValue().toLocalTime());
+        assertEquals(5L, result.getTodayCount());
+    }
+
+    @Test
+    @DisplayName("Тест 5.1: Проверка аннотации @Transactional(readOnly = true)")
+    void getStats_ShouldHaveTransactionalReadOnlyAnnotation() throws Exception {
+        var method = ClientsServiceImpl.class.getMethod("getStats");
+
+        assertTrue(method.isAnnotationPresent(Transactional.class),
+                "Метод должен быть аннотирован @Transactional");
+
+        Transactional annotation = method.getAnnotation(Transactional.class);
+        assertTrue(annotation.readOnly(), "readOnly должен быть true");
+    }
+
+    @Test
     void getAllClients_WithValidFilter_ShouldReturnMappedClients() {
         // Given
         ClientsFilterRqDto filter = new ClientsFilterRqDto();
@@ -134,10 +216,8 @@ class ClientsServiceImplTest {
         when(clientsRepository.findAll(eq(specification), any(Sort.class))).thenReturn(clients);
         when(clientsMapper.toAdminResponseList(clients)).thenReturn(expectedDtos);
 
-        // When
         List<ClientsAdminRsDto> result = clientsService.getAllClients(filter);
 
-        // Then
         assertThat(result).isEqualTo(expectedDtos);
         assertThat(result).hasSize(2);
 
@@ -156,7 +236,6 @@ class ClientsServiceImplTest {
         when(clientsRepository.findAll(eq(specification), any(Sort.class)))
                 .thenThrow(new RuntimeException("Database error"));
 
-        // When/Then
         assertThatThrownBy(() -> clientsService.getAllClients(filter))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Ошибка при получении списка клиентов");

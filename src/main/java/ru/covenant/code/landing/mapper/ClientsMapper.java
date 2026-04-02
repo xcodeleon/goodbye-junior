@@ -165,4 +165,34 @@ public interface ClientsMapper {
     default LocalDateTime offsetToLocalDateTime(OffsetDateTime offsetDateTime) {
         return offsetDateTime != null ? offsetDateTime.toLocalDateTime() : null;
     }
+
+    @Named("createStatsDto")
+    default ClientsStatsRsDto createStatsDto(
+            long total,
+            long newCount,
+            long processedCount,
+            long doneCount,
+            long todayCount,
+            long fullstackCount,
+            long frontendCount,
+            long backendCount,
+            long highPriorityCount,
+            long mediumPriorityCount,
+            long lowPriorityCount) {
+
+        ClientsStatsRsDto stats = new ClientsStatsRsDto();
+        stats.setTotal(total);
+        stats.setNewCount(newCount);
+        stats.setProcessedCount(processedCount);
+        stats.setDoneCount(doneCount);
+        stats.setTodayCount(todayCount);
+        stats.setFullstackCount(fullstackCount);
+        stats.setFrontendCount(frontendCount);
+        stats.setBackendCount(backendCount);
+        stats.setHighPriorityCount(highPriorityCount);
+        stats.setMediumPriorityCount(mediumPriorityCount);
+        stats.setLowPriorityCount(lowPriorityCount);
+
+        return stats;
+    }
 }

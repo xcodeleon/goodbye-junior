@@ -9,8 +9,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import ru.covenant.code.landing.dto.client.request.ClientsUpdateRqDto;
@@ -20,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ru.covenant.code.landing.dto.client.response.ClientsAdminRsDto;
+import ru.covenant.code.landing.dto.client.response.ClientsStatsRsDto;
 import ru.covenant.code.landing.entity.enumerated.CourseType;
 import ru.covenant.code.landing.entity.enumerated.Priority;
 import ru.covenant.code.landing.entity.enumerated.Status;
@@ -27,6 +35,7 @@ import ru.covenant.code.landing.error.ResponseWrapper;
 import ru.covenant.code.landing.exceptions.ClientNotFoundException;
 import ru.covenant.code.landing.exceptions.PersistenceException;
 import ru.covenant.code.landing.exceptions.ValidationException;
+import ru.covenant.code.landing.security.config.SecurityConfig;
 import ru.covenant.code.landing.service.client.ClientsService;
 
 
@@ -40,13 +49,16 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Тесты для контроллера AdminClientsController для работы с клиентами")
 @Tag("unit")
 class AdminClientsControllerTest {
 
-    @Mock
+    @MockitoBean
     private ClientsService clientsService;
 
     @InjectMocks
@@ -59,6 +71,7 @@ class AdminClientsControllerTest {
     private ClientsUpdateRqDto validUpdateDto;
     private ClientsAdminRsDto updatedClientDto;
 
+    @Autowired
     private MockMvc mockMvc;
 
     @InjectMocks
@@ -74,6 +87,8 @@ class AdminClientsControllerTest {
 
     String expectedErrorMessage;
 
+    private ClientsStatsRsDto fullStatsDto;
+    private ClientsStatsRsDto zeroStatsDto;
 
     private ResponseWrapper<ClientsAdminRsDto> testResponseWrapper;
 
@@ -154,7 +169,88 @@ class AdminClientsControllerTest {
         testClientAdminRsDto.setFormattedProcessedAt(null);
 
         testResponseWrapper = ResponseWrapper.success(testClientAdminRsDto);
+
+        fullStatsDto = new ClientsStatsRsDto();
+        fullStatsDto.setTotal(1250L);
+        fullStatsDto.setNewCount(15L);
+        fullStatsDto.setProcessedCount(25L);
+        fullStatsDto.setDoneCount(1200L);
+        fullStatsDto.setTodayCount(15L);
+        fullStatsDto.setFullstackCount(500L);
+        fullStatsDto.setFrontendCount(350L);
+        fullStatsDto.setBackendCount(400L);
+        fullStatsDto.setHighPriorityCount(100L);
+        fullStatsDto.setMediumPriorityCount(800L);
+        fullStatsDto.setLowPriorityCount(350L);
+
+        zeroStatsDto = new ClientsStatsRsDto();
+        zeroStatsDto.setTotal(0L);
+        zeroStatsDto.setNewCount(0L);
+        zeroStatsDto.setProcessedCount(0L);
+        zeroStatsDto.setDoneCount(0L);
+        zeroStatsDto.setTodayCount(0L);
+        zeroStatsDto.setFullstackCount(0L);
+        zeroStatsDto.setFrontendCount(0L);
+        zeroStatsDto.setBackendCount(0L);
+        zeroStatsDto.setHighPriorityCount(0L);
+        zeroStatsDto.setMediumPriorityCount(0L);
+        zeroStatsDto.setLowPriorityCount(0L);
     }
+
+    @Test
+    @DisplayName("Тест 1.1: Успешное получение статистики - возвращает 200 и все поля")
+    @WithMockUser(roles = "ADMIN")
+    void getStats_ShouldReturnFullStats_WhenDataExists() throws Exception {
+
+        when(clientsService.getStats()).thenReturn(fullStatsDto);
+
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.result.total").value(1250))
+                .andExpect(jsonPath("$.result.newCount").value(15))
+                .andExpect(jsonPath("$.result.processedCount").value(25))
+                .andExpect(jsonPath("$.result.doneCount").value(1200))
+                .andExpect(jsonPath("$.result.todayCount").value(15))
+                .andExpect(jsonPath("$.result.fullstackCount").value(500))
+                .andExpect(jsonPath("$.result.frontendCount").value(350))
+                .andExpect(jsonPath("$.result.backendCount").value(400))
+                .andExpect(jsonPath("$.result.highPriorityCount").value(100))
+                .andExpect(jsonPath("$.result.mediumPriorityCount").value(800))
+                .andExpect(jsonPath("$.result.lowPriorityCount").value(350));
+
+        verify(clientsService, times(1)).getStats();
+    }
+
+
+    @Test
+    @DisplayName("Тест 2.1: Доступ к статистике для ADMIN - должен вернуть 200")
+    @WithMockUser(roles = "ADMIN")
+    void getStats_WithAdminRole_ShouldReturn200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Тест 3.1: Доступ к статистике для MODERATOR - должен вернуть 200")
+    @WithMockUser(roles = "MODERATOR")
+    void getStats_WithModeratorRole_ShouldReturn200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Тест 4.1: Доступ к статистике для SUPPORT - должен вернуть 200")
+    @WithMockUser(roles = "SUPPORT")
+    void getStats_WithSupportRole_ShouldReturn200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/clients/stats")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
 
     @Test
     @DisplayName("Успешное получение клиентов по статусу - должен вернуть 200 OK со списком DTO")
@@ -320,7 +416,6 @@ class AdminClientsControllerTest {
     void getClientById_ShouldPassPathVariableToService() throws Exception {
 
         when(clientsService.getClientById(testUuid)).thenReturn(testClientAdminRsDto);
-
 
         ArgumentCaptor<UUID> uuidCaptor = ArgumentCaptor.forClass(UUID.class);
 

@@ -204,7 +204,9 @@ public class ClientsServiceImpl implements ClientsService {
         }
     }
 
-    private ClientsStatsRsDto getStats() {
+    @Override
+    @Transactional(readOnly = true)
+    public ClientsStatsRsDto getStats() {
         ClientsStatsRsDto stats = new ClientsStatsRsDto();
 
         try {
@@ -243,7 +245,6 @@ public class ClientsServiceImpl implements ClientsService {
             stats.setMediumPriorityCount(0);
             stats.setLowPriorityCount(0);
         }
-
         return stats;
     }
 

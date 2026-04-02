@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.covenant.code.landing.dto.client.request.ClientsFilterRqDto;
 import ru.covenant.code.landing.dto.client.request.ClientsUpdateRqDto;
 import ru.covenant.code.landing.dto.client.response.ClientsAdminRsDto;
+import ru.covenant.code.landing.dto.client.response.ClientsStatsRsDto;
 import ru.covenant.code.landing.entity.Clients;
 import ru.covenant.code.landing.error.ResponseWrapper;
 import ru.covenant.code.landing.service.client.ClientsService;
@@ -297,6 +298,74 @@ public class AdminClientsController {
         log.info("REST Получение клиента по id: {}", id);
         ClientsAdminRsDto client = clientsService.getClientById(id);
         return ResponseWrapper.success(client);
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'SUPPORT')")
+    @Operation(
+            summary = "Получить статистику по клиентам",
+            description = """
+                    Возвращает общую статистику по клиентам:
+                    - общее количество заявок
+                    - распределение по статусам (NEW, PROCESSED, DONE)
+                    - количество заявок за сегодня
+                    - распределение по типам курсов (FULLSTACK, FRONTEND, BACKEND)
+                    - распределение по приоритетам (HIGH, MEDIUM, LOW)
+                    
+                    Доступно только для ADMIN, MODERATOR и SUPPORT.
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Успешный ответ со статистикой",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseWrapper.class),
+                            examples = @ExampleObject(
+                                    name = "successResponse",
+                                    summary = "Успешный ответ со статистикой",
+                                    value = """
+                                            {
+                                                "success": true,
+                                                "result": {
+                                                    "total": 1250,
+                                                    "newCount": 15,
+                                                    "processedCount": 25,
+                                                    "doneCount": 1200,
+                                                    "todayCount": 15,
+                                                    "fullstackCount": 500,
+                                                    "frontendCount": 350,
+                                                    "backendCount": 400,
+                                                    "highPriorityCount": 100,
+                                                    "mediumPriorityCount": 800,
+                                                    "lowPriorityCount": 350
+                                                }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Требуется аутентификация",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Недостаточно прав",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Внутренняя ошибка сервера",
+                    content = @Content
+            )
+    })
+    public ResponseWrapper<ClientsStatsRsDto> getStats() {
+        log.info("REST Запрос на получение статистики по клиентам");
+        ClientsStatsRsDto stats = clientsService.getStats();
+        return ResponseWrapper.success(stats);
     }
 
     @DeleteMapping("/{id}")

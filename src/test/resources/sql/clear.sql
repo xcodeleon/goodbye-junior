@@ -1,0 +1,3 @@
+DELETE FROM "CLIENTS_DB";
+-- Сброс автоинкремента (если есть)
+-- ALTER TABLE "CLIENTS_DB" ALTER COLUMN id RESTART WITH 1;

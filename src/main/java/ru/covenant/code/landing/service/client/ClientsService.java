@@ -4,6 +4,7 @@ import ru.covenant.code.landing.dto.client.request.ClientsFilterRqDto;
 import ru.covenant.code.landing.dto.client.request.ClientsUpdateRqDto;
 import ru.covenant.code.landing.dto.client.request.ClientsRqDto;
 import ru.covenant.code.landing.dto.client.response.ClientsAdminRsDto;
+import ru.covenant.code.landing.dto.client.response.ClientsStatsRsDto;
 import ru.covenant.code.landing.entity.Clients;
 import ru.covenant.code.landing.dto.client.response.ClientsCreateRsDto;
 
@@ -20,6 +21,8 @@ public interface ClientsService {
     ClientsAdminRsDto getClientById(UUID id);
 
     ClientsCreateRsDto create(ClientsRqDto request);
+
+    ClientsStatsRsDto getStats();
 
     void delete(UUID id);
 }
