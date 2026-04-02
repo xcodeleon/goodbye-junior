@@ -600,7 +600,7 @@ class AdminClientsControllerIntegrationTest {
     @DisplayName("2.1 Запрос статистики с пустой БД - возвращает нулевую статистику")
     @WithMockUser(roles = "ADMIN")
     void getStats_EmptyDatabase_ShouldReturnZeroStats() throws Exception {
-        // Given: Очищаем БД
+
         clientsRepository.deleteAll();
         clientsRepository.flush();
 
@@ -624,26 +624,22 @@ class AdminClientsControllerIntegrationTest {
     @Test
     @DisplayName("3.1 Тест авторизации для разных ролей - доступ к статистике")
     void getStats_AccessControlForDifferentRoles() throws Exception {
-        // Given: Создаем тестовые данные
+
         clientsRepository.save(Clients.builder()
                 .email("test@test.com").name("Test").status(Status.NEW).build());
 
-        // When & Then: ADMIN - доступ разрешен
         mockMvc.perform(get("/api/v1/admin/clients/stats")
                         .with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk());
 
-        // MODERATOR - доступ разрешен
         mockMvc.perform(get("/api/v1/admin/clients/stats")
                         .with(user("moderator").roles("MODERATOR")))
                 .andExpect(status().isOk());
 
-        // SUPPORT - доступ разрешен
         mockMvc.perform(get("/api/v1/admin/clients/stats")
                         .with(user("support").roles("SUPPORT")))
                 .andExpect(status().isOk());
 
-        // USER - доступ запрещен
         mockMvc.perform(get("/api/v1/admin/clients/stats")
                         .with(user("user").roles("USER")))
                 .andExpect(status().isForbidden());
@@ -674,14 +670,12 @@ class AdminClientsControllerIntegrationTest {
 
         assertEquals(5, stats.get("total").asLong());
 
-        // так как тестовые данные "только за сегодня" — todayCount должен совпадать с total
         assertEquals(5, stats.get("todayCount").asLong());
 
         assertEquals(3, stats.get("newCount").asLong());
         assertEquals(1, stats.get("processedCount").asLong());
         assertEquals(1, stats.get("doneCount").asLong());
 
-        // контроль, что статусы сходятся в total
         assertEquals(stats.get("total").asLong(),
                 stats.get("newCount").asLong()
                         + stats.get("processedCount").asLong()
@@ -692,7 +686,7 @@ class AdminClientsControllerIntegrationTest {
     @DisplayName("6.1 Статистика - проверка суммирования статусов")
     @WithMockUser(roles = "ADMIN")
     void getStats_StatusesSumEqualsTotal() throws Exception {
-        // Создаем по 1 клиенту каждого статуса
+
         clientsRepository.saveAll(Arrays.asList(
                 Clients.builder().status(Status.NEW).build(),
                 Clients.builder().status(Status.PROCESSED).build(),
@@ -705,7 +699,6 @@ class AdminClientsControllerIntegrationTest {
                 .andReturn();
 
         String content = result.getResponse().getContentAsString();
-        // Парсим JSON для проверки сумм
         JsonNode response = objectMapper.readTree(content);
         JsonNode stats = response.get("result");
 

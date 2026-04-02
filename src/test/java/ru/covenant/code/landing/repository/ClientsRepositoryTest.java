@@ -286,15 +286,11 @@ class ClientsRepositoryTest {
         );
         clientsRepository.saveAll(clientsToSave);
 
-        // When
         long backendCount = clientsRepository.countByCourseType(CourseType.BACKEND);
 
-        // Then
         assertEquals(1L, backendCount, "Должно быть 2 клиента на BACKEND курс");
     }
 
-
-    // ==================== 4. ТЕСТЫ COUNT BY PRIORITY ====================
 
     @Test
     @DisplayName("countByPriority - проверка подсчета клиентов с приоритетом HIGH")
@@ -344,8 +340,6 @@ class ClientsRepositoryTest {
     }
 
 
-    // ==================== 5. ТЕСТЫ ГРАНИЧНЫХ УСЛОВИЙ ====================
-
     @Test
     @DisplayName("Граничный тест: подсчет при отсутствии данных")
     void countMethods_WithEmptyDatabase_ShouldReturnZero() {
@@ -361,7 +355,6 @@ class ClientsRepositoryTest {
         long mediumPriorityCount = clientsRepository.countByPriority(Priority.MEDIUM);
         long lowPriorityCount = clientsRepository.countByPriority(Priority.LOW);
 
-        // Then
         assertEquals(0L, total);
         assertEquals(0L, newCount);
         assertEquals(0L, processedCount);
@@ -385,7 +378,6 @@ class ClientsRepositoryTest {
             CourseType courseType = i % 3 == 0 ? CourseType.BACKEND : (i % 3 == 1 ? CourseType.FRONTEND : CourseType.FULLSTACK);
             Priority priority = i % 3 == 0 ? Priority.HIGH : (i % 3 == 1 ? Priority.MEDIUM : Priority.LOW);
 
-            // ✅ ИСПРАВЛЕНО: используем переменные для создания разных клиентов
             Clients client = createClientForStats(
                     "client" + i + "@test.com",
                     "Клиент " + i,
@@ -398,7 +390,6 @@ class ClientsRepositoryTest {
 
         clientsRepository.saveAll(allClients);
 
-        // When
         long total = clientsRepository.count();
         long newCount = clientsRepository.countByStatus(Status.NEW);
         long processedCount = clientsRepository.countByStatus(Status.PROCESSED);
@@ -410,7 +401,6 @@ class ClientsRepositoryTest {
         long mediumPriorityCount = clientsRepository.countByPriority(Priority.MEDIUM);
         long lowPriorityCount = clientsRepository.countByPriority(Priority.LOW);
 
-        // Then
         assertEquals(100L, total);
         assertEquals(34L, newCount);
         assertEquals(33L, processedCount);
@@ -423,7 +413,6 @@ class ClientsRepositoryTest {
         assertEquals(33L, lowPriorityCount);
     }
 
-    // ==================== 6. ТЕСТЫ РАБОТЫ С ВРЕМЕННЫМИ ЗОНАМИ ====================
 
     @Test
     @DisplayName("Работа с временными зонами - проверка countByCreatedAtBetween с разными зонами")
@@ -445,7 +434,7 @@ class ClientsRepositoryTest {
         client.setEmail("test@example.com");
         client.setName("Test User");
         client.setCourseType(CourseType.BACKEND);
-        client.setCreatedAt(now.toOffsetDateTime()); // Преобразуем в OffsetDateTime
+        client.setCreatedAt(now.toOffsetDateTime());
         clientsRepository.saveAndFlush(client);
 
         Clients saved = clientsRepository.findAll().get(0);

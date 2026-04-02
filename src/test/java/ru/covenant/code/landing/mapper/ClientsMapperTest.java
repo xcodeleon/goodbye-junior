@@ -85,10 +85,6 @@ class ClientsMapperTest {
                 .processedBy(null)
                 .build();
 
-        // SetUp Дмитрия
-
-
-
         existingClient = new Clients();
         existingClient.setId(UUID.randomUUID());
         existingClient.setName("Иван Петров");
@@ -343,23 +339,6 @@ class ClientsMapperTest {
     private Clients existingClient;
     private OffsetDateTime initialUpdatedAt;
 
-//        existingClient = new Clients();
-//        existingClient.setId(UUID.randomUUID());
-//        existingClient.setName("Иван Петров");
-//        existingClient.setEmail("ivan@example.com");
-//        existingClient.setPhone("+79161234567");
-//        existingClient.setMessage("Старое сообщение");
-//        existingClient.setCourseType(CourseType.BACKEND);
-//        existingClient.setStatus(Status.NEW);
-//        existingClient.setPriority(Priority.MEDIUM);
-//        existingClient.setSource("Лендинг");
-//        existingClient.setProcessedBy(null);
-//        existingClient.setProcessedAt(null);
-//
-//        initialUpdatedAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
-//        existingClient.setUpdatedAt(initialUpdatedAt);
-//    }
-
     @Test
     @DisplayName("updateEntity - полное обновление всех полей")
     void updateEntity_WithFullDto_ShouldUpdateAllFields() {
@@ -576,34 +555,25 @@ class ClientsMapperTest {
     @Test
     @DisplayName("updateEntity - невалидные строки в Enum не обновляют поля")
     void updateEntity_WithInvalidEnumStrings_ShouldNotUpdateFields() {
-        // Given
+
         ClientsUpdateRqDto dtoWithInvalidEnums = ClientsUpdateRqDto.builder()
                 .courseType("INVALID_COURSE")
                 .status("INVALID_STATUS")
                 .priority("INVALID_PRIORITY")
                 .build();
 
-        // When
         clientsMapper.updateEntity(existingClient, dtoWithInvalidEnums);
-
-//        // Then
-//        // Поля остались прежними
-//        assertEquals(CourseType.BACKEND, existingClient.getCourseType());
-//        assertEquals(Status.NEW, existingClient.getStatus());
-//        assertEquals(Priority.MEDIUM, existingClient.getPriority());
 
         assertNull(existingClient.getCourseType());
         assertNull(existingClient.getStatus());
         assertNull(existingClient.getPriority());
 
-        // Остальные поля не изменились
         assertEquals("Иван Петров", existingClient.getName());
         assertEquals("ivan@example.com", existingClient.getEmail());
         assertEquals("+79161234567", existingClient.getPhone());
         assertEquals("Старое сообщение", existingClient.getMessage());
         assertEquals("Лендинг", existingClient.getSource());
 
-        // updatedAt обновился
         assertNotNull(existingClient.getUpdatedAt());
     }
 
@@ -901,10 +871,8 @@ class ClientsMapperTest {
         loginStats.setTotalApplications(100L);
         loginStats.setSuccessfulApplications(50L);
 
-        // When
         ClientsStatsRsDto result = clientsMapper.toClientsStats(loginStats);
 
-        // Then
         assertNotNull(result);
         assertEquals(10L, result.getTodayCount());
         assertEquals(100L, result.getTotal());
@@ -931,10 +899,8 @@ class ClientsMapperTest {
         client.setCourseType(CourseType.BACKEND);
         client.setCreatedAt(OffsetDateTime.now());
 
-        // When
         ClientsCreateRsDto result = clientsMapper.toCreateResponse(client);
 
-        // Then
         assertNotNull(result);
         assertNotNull(result.getResult());
         assertEquals(clientId, result.getResult().getId());
@@ -984,7 +950,7 @@ class ClientsMapperTest {
     @Test
     @DisplayName("createStatsDto: проверка порядка параметров (каждое поле получает своё значение)")
     void createStatsDto_ShouldRespectParameterOrder() {
-        // уникальные значения, чтобы сразу ловить перепутанный порядок
+
         long total = 1L;
         long newCount = 2L;
         long processedCount = 3L;
